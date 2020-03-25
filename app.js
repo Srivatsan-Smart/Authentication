@@ -4,7 +4,9 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const encrypt = require('mongoose-encryption');
+
+const bcrypt = require('bcrypt');
+const saltRounds = 8;
 
 const app = express();
 
@@ -27,7 +29,7 @@ const userSchema = new mongoose.Schema({
 });
 
 
-userSchema.plugin(encrypt, { secret: process.env.SECRET, encryptedFields : ["password"]});
+
 
 const User = mongoose.model("User",userSchema);
 
@@ -47,40 +49,57 @@ app.get("/register",function(req,res){
 
 
 app.post("/register",function(req,res){
-  const user = new User({
-    email : req.body.username,
-    password : req.body.password
+
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    const user = new User({
+      email : req.body.username,
+      password : hash
+    });
+
+    user.save(function(err){
+      if(err) console.log(err);
+      else {
+        res.render("secrets");
+      }
+    });
   });
 
-  user.save(function(err){
-    if(err) console.log(err);
-    else {
-      res.render("secrets");
-    }
-  });
+
+
 });
 
 
 app.post("/login",function(req,res){
-  const email = req.body.username;
-  const password = req.body.password;
 
-  User.findOne({email : email},function(err,foundUser){
-    if(err) console.log(err);
-    else{
-      if(foundUser){
-        if(foundUser.password === password){
-          res.render("secrets");
+
+
+
+
+    const email = req.body.username;
+    const password = req.body.password;
+
+    User.findOne({email : email},function(err,foundUser){
+      if(err) console.log(err);
+      else{
+        if(foundUser){
+          bcrypt.compare(password, foundUser.password).then(function(result) {
+            if(result === true){
+              res.render("secrets");
+            }
+            else{
+              res.send("Login Failed");
+            }
+          });
         }
         else{
           res.send("Login Failed");
         }
       }
-      else{
-        res.send("Login Failed");
-      }
-    }
-  });
+    });
+
+
+
+
 });
 app.listen("3000",function(){
   console.log("Server started at 3000");
